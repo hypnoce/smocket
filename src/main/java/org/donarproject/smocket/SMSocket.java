@@ -95,12 +95,7 @@ public class SMSocket implements Closeable {
                 add(StandardOpenOption.WRITE);
             }});
             inputStream = new SMInputStream(in);
-            closeNotificationThread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    watchForClose(closeLocker);
-                }
-            }, "Close wait " + sessionId);
+            closeNotificationThread = new Thread(() -> watchForClose(closeLocker), "Close wait " + sessionId);
             closeNotificationThread.start();
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -135,12 +130,7 @@ public class SMSocket implements Closeable {
                 add(StandardOpenOption.WRITE);
             }});
             inputStream = new SMInputStream(inFC);
-            closeNotificationThread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    watchForClose(closeLocker);
-                }
-            }, "Close wait " + sessionId);
+            closeNotificationThread = new Thread(() -> watchForClose(closeLocker), "Close wait " + sessionId);
             closeNotificationThread.start();
         } catch (Throwable t) {
             t.printStackTrace();
@@ -219,12 +209,7 @@ public class SMSocket implements Closeable {
         Thread[] threads = new Thread[10];
         for (int i = 0; i < threads.length; ++i) {
             final int j = i;
-            Thread thread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    _do(j);
-                }
-            });
+            Thread thread = new Thread(() -> _do(j));
             thread.start();
             threads[i] = thread;
         }

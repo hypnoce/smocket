@@ -94,7 +94,8 @@ public class PeriodicWritableByteChannel implements Runnable, WritableByteChanne
         try {
             scheduler.awaitTermination(1, TimeUnit.SECONDS);
         } catch (InterruptedException e) {
-            e.printStackTrace();
+            Thread.currentThread().interrupt();
+            throw new IOException(e);
         }
         out.close();
     }

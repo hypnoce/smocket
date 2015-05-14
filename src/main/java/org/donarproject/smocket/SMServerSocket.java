@@ -159,33 +159,29 @@ public class SMServerSocket implements Closeable {
         for (; ; ) {
             Iterable<SMSocket> sockets = serverSocket.accept();
             for (final SMSocket _socket : sockets) {
-                new Thread(Thread.currentThread().getThreadGroup(), new Runnable() {
-                    @Override
-
-                    public void run() {
-                        long bytesSent = 0;
-                        long time = 0;
-                        try (SMSocket socket = _socket;
-                             OutputStream smo = socket.getOutputStream();
-                             PeriodicBufferedOutputStream bufferedOutputStream = new PeriodicBufferedOutputStream(smo, 8192 * 16, 10)) {
-                            time = System.nanoTime();
-                            for (int i = 0; i < 100; ++i) {
-                                for (byte[] bytes : values) {
-                                    final int length = bytes.length;
-                                    bytesSent += length;
-                                    bufferedOutputStream.write(bytes, 0, length);
-                                }
+                new Thread(Thread.currentThread().getThreadGroup(), () -> {
+                    long bytesSent = 0;
+                    long time = 0;
+                    try (SMSocket socket = _socket;
+                         OutputStream smo = socket.getOutputStream();
+                         PeriodicBufferedOutputStream bufferedOutputStream = new PeriodicBufferedOutputStream(smo, 8192 * 16, 10)) {
+                        time = System.nanoTime();
+                        for (int i = 0; i < 100; ++i) {
+                            for (byte[] bytes : values) {
+                                final int length = bytes.length;
+                                bytesSent += length;
+                                bufferedOutputStream.write(bytes, 0, length);
                             }
-                            bufferedOutputStream.flush();
-                        } catch (Throwable t) {
-                            t.printStackTrace();
-                        } finally {
-                            time = (System.nanoTime() - time);
-                            logger.log(Level.INFO, (bytesSent) + "B in " + (time / 1000000.) + " ms");
-                            logger.log(Level.INFO, "Throughput : " + (bytesSent / 1000000.) / (time / 1000000000.) + " MB/s");
                         }
-
+                        bufferedOutputStream.flush();
+                    } catch (Throwable t) {
+                        t.printStackTrace();
+                    } finally {
+                        time = (System.nanoTime() - time);
+                        logger.log(Level.INFO, (bytesSent) + "B in " + (time / 1000000.) + " ms");
+                        logger.log(Level.INFO, "Throughput : " + (bytesSent / 1000000.) / (time / 1000000000.) + " MB/s");
                     }
+
                 }).start();
             }
         }
