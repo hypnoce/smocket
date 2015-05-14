@@ -50,11 +50,9 @@ public class TestServer {
 
             //        BufferedReader bufferRead = new BufferedReader(new InputStreamReader(System.in));
             System.out.println("Ready");
-            PeriodicBufferedOutputStream os = null;
             long bytesSent = 0;
             long time = 0;
-            try {
-                os = new PeriodicBufferedOutputStream(new PipeServerOutputStream(handel), 8192 * 16);
+            try (PeriodicBufferedOutputStream os = new PeriodicBufferedOutputStream(new PipeServerOutputStream(handel), 8192 * 16)) {
 
                 //        byte[] toto = bufferRead.readLine().concat("\n").getBytes();
                 //        bytesSent += toto.length;
@@ -72,13 +70,6 @@ public class TestServer {
                 t.printStackTrace();
             } finally {
                 time = System.nanoTime() - time;
-                if (os != null) {
-                    try {
-                        os.close();
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
                 System.out.println((bytesSent) + "B in " + (time / 1000000) + " ms");
                 System.out.println("Throughput : " + (bytesSent / 1000000.) / (time / 1000000000.) + " MB/s");
             }

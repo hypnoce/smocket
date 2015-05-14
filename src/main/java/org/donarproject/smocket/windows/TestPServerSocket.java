@@ -37,15 +37,14 @@ public class TestPServerSocket {
 
         logger.info("Ready");
         for (; ; ) {
-            final PSocket socket = serverSocket.accept();
+            final PSocket _socket = serverSocket.accept();
             new Thread(new Runnable() {
                 @Override
                 public void run() {
-                    PeriodicBufferedOutputStream os = null;
                     long bytesSent = 0;
                     long time = 0;
-                    try {
-                        os = new PeriodicBufferedOutputStream(socket.getOutputStream(), 8192 * 16);
+                    try (PSocket socket = _socket;
+                         PeriodicBufferedOutputStream os = new PeriodicBufferedOutputStream(socket.getOutputStream(), 8192 * 16)) {
                         time = System.nanoTime();
                         for (int i = 0; i < 100; ++i)
                             for (byte[] s : values) {
@@ -56,20 +55,8 @@ public class TestPServerSocket {
                         os.flush();
                     } catch (Throwable t) {
                         t.printStackTrace();
-                        try {
-                            socket.close();
-                        } catch (IOException e) {
-                            e.printStackTrace();
-                        }
                     } finally {
                         time = System.nanoTime() - time;
-                        if (os != null) {
-                            try {
-                                os.close();
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                            }
-                        }
                         logger.info((bytesSent) + "B in " + (time / 1000000) + " ms");
                         logger.info("Throughput : " + (bytesSent / 1000000.) / (time / 1000000000.) + " MB/s");
                     }

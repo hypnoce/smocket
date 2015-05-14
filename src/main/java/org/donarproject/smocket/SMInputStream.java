@@ -190,10 +190,9 @@ public class SMInputStream extends InputStream implements SMStream {
     }
 
     public static void main(String[] args) throws IOException {
-        SMInputStream smi = new SMInputStream(Paths.get("E:\\exchange_file"));
         long bytesReceived = 0;
         final int bufferSize = 8192 * 16;
-        try {
+        try (SMInputStream smi = new SMInputStream(Paths.get("E:\\exchange_file"))) {
             byte[] buffer = new byte[bufferSize];
             bytesReceived += smi.read(buffer, 0, bufferSize);
             int read;

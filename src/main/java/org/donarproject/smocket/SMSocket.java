@@ -31,7 +31,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class SMSocket implements Closeable {
-    private final static Logger logger = Logger.getLogger(SMSocket.class.getName());
+    private final static Logger LOGGER = Logger.getLogger(SMSocket.class.getName());
     private final Object closeLock = new Object();
     private final SMInputStream inputStream;
     private final SMOutputStream outputStream;
@@ -55,7 +55,7 @@ public class SMSocket implements Closeable {
 
     private final Set<FileChannel> fcs = new HashSet<>();
 
-    public SMSocket(final String hostname, final String port) throws IOException, InterruptedException, TimeoutException {
+    public SMSocket(final String hostname, final String port) throws IOException {
         Path serverPath = Paths.get(hostname, port);
         if (!Files.exists(serverPath)) {
             throw new IOException("Cannot connect to " + hostname + ":" + port);
@@ -75,32 +75,39 @@ public class SMSocket implements Closeable {
         Path file = host.resolve(suffix);
         fcs.add(SMUtils.createDeleteOnExitFile(file));
         ConcurrentSMUtils utils = ConcurrentSMUtils.getInstance(host, port);
-        Path out = utils.waitForFileCreation(host, suffix + "_out", 5, TimeUnit.SECONDS);
+        try {
+            Path out = utils.waitForFileCreation(host, suffix + "_out", 5, TimeUnit.SECONDS);
 
-        outputStream = new SMOutputStream(out);
+            outputStream = new SMOutputStream(out);
 
-        Path client_lock = host.resolve(suffix + "_client.lock");
-        FileChannel lockChannel = SMUtils.createDeleteOnExitFile(client_lock);
-        remoteCloseLocker = lockChannel.lock(0, 1, false);
-        fcs.add(lockChannel);
+            Path client_lock = host.resolve(suffix + "_client.lock");
+            FileChannel lockChannel = SMUtils.createDeleteOnExitFile(client_lock);
+            remoteCloseLocker = lockChannel.lock(0, 1, false);
+            fcs.add(lockChannel);
 
-        Path rack = host.resolve(suffix + "_client_ack");
-        FileChannel rackChannel = SMUtils.createDeleteOnExitFile(rack);
-        fcs.add(rackChannel);
+            Path rack = host.resolve(suffix + "_client_ack");
+            FileChannel rackChannel = SMUtils.createDeleteOnExitFile(rack);
+            fcs.add(rackChannel);
 
-        Path in = utils.waitForFileCreation(host, suffix + "_in", 5, TimeUnit.SECONDS);
-        closeLocker = in.getFileSystem().provider().newFileChannel(host.resolve(suffix + "_server.lock"), new HashSet<OpenOption>() {{
-            add(StandardOpenOption.READ);
-            add(StandardOpenOption.WRITE);
-        }});
-        inputStream = new SMInputStream(in);
-        closeNotificationThread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                watchForClose(closeLocker);
-            }
-        }, "Close wait " + sessionId);
-        closeNotificationThread.start();
+            Path in = utils.waitForFileCreation(host, suffix + "_in", 5, TimeUnit.SECONDS);
+            closeLocker = in.getFileSystem().provider().newFileChannel(host.resolve(suffix + "_server.lock"), new HashSet<OpenOption>() {{
+                add(StandardOpenOption.READ);
+                add(StandardOpenOption.WRITE);
+            }});
+            inputStream = new SMInputStream(in);
+            closeNotificationThread = new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    watchForClose(closeLocker);
+                }
+            }, "Close wait " + sessionId);
+            closeNotificationThread.start();
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IOException("Cannot connect to " + hostname + ":" + port, e);
+        } catch (TimeoutException e) {
+            throw new IOException("Cannot connect to " + hostname + ":" + port, e);
+        }
     }
 
     SMSocket(final Path host, final String port, final String sessionId, final Path in, final Path out) throws IOException, InterruptedException, TimeoutException {
@@ -204,59 +211,47 @@ public class SMSocket implements Closeable {
         for (int i = 0; i < 60; ++i) {
             _do(i);
         }
-        logger.log(Level.INFO, (System.nanoTime() - totalTime) / 1000000. + " ms");
+        LOGGER.log(Level.INFO, (System.nanoTime() - totalTime) / 1000000. + " ms");
     }
 
     public static void main(String[] args) throws InterruptedException, IOException, TimeoutException {
         long totalTime = System.nanoTime();
-        ExecutorService service = Executors.newFixedThreadPool(16);
-        Set<Future> futures = new HashSet<>();
-        for (int i = 0; i < 10; ++i) {
+        Thread[] threads = new Thread[10];
+        for (int i = 0; i < threads.length; ++i) {
             final int j = i;
-            Future<Object> future = service.submit(new Callable<Object>() {
+            Thread thread = new Thread(new Runnable() {
                 @Override
-                public Object call() throws Exception {
+                public void run() {
                     _do(j);
-                    return null;
                 }
             });
-            futures.add(future);
+            thread.start();
+            threads[i] = thread;
         }
-        for (Future future : futures) {
-            try {
-                future.get();
-            } catch (ExecutionException e) {
-                e.printStackTrace();
-            }
+        for (Thread thread : threads) {
+            thread.join();
         }
-        service.shutdown();
-        service.awaitTermination(1000, TimeUnit.SECONDS);
-        logger.log(Level.INFO, (System.nanoTime() - totalTime) / 1000000. + " ms");
+        LOGGER.log(Level.INFO, (System.nanoTime() - totalTime) / 1000000. + " ms");
     }
 
-    private static void _do(int id) throws IOException, TimeoutException, InterruptedException {
+    private static void _do(int id) {
+        long bytesReceived = 0;
+        long time = 0;
         try (SMSocket socket = new SMSocket("E:\\smocket_tmp", "7777")) {
             InputStream smi = socket.getInputStream();
-            long bytesReceived = 0;
             final int bufferSize = 8192 * 16;
-            long time = 0;
-            try {
-                byte[] buffer = new byte[bufferSize];
-                bytesReceived += smi.read(buffer, 0, bufferSize);
-                int read;
-                time = System.nanoTime();
-                while ((read = smi.read(buffer, 0, bufferSize)) != -1) {
-                    bytesReceived += read;
-                }
-                time = System.nanoTime() - time;
-            } catch (Throwable t) {
-                t.printStackTrace();
-            } finally {
-                logger.log(Level.INFO, "Socket " + id + " : " + (bytesReceived) + "B in " + (time / 1000000.) + " ms");
+            byte[] buffer = new byte[bufferSize];
+            bytesReceived += smi.read(buffer, 0, bufferSize);
+            int read;
+            time = System.nanoTime();
+            while ((read = smi.read(buffer, 0, bufferSize)) != -1) {
+                bytesReceived += read;
             }
-        } catch (InterruptedException t) {
-            Thread.currentThread().interrupt();
-            throw t;
+            time = System.nanoTime() - time;
+        } catch (Throwable t) {
+            LOGGER.log(Level.WARNING, "An exception occurred while reading from SMSocket", t);
+        } finally {
+            LOGGER.log(Level.INFO, "Socket " + id + " : " + (bytesReceived) + "B in " + (time / 1000000.) + " ms");
         }
     }
 }

@@ -32,7 +32,7 @@ import static com.sun.jna.platform.win32.WinNT.HANDLE;
 /**
  * A client can use RandomAccessFile to connect to a named pipe.
  */
-public class PSocket {
+public class PSocket implements AutoCloseable {
     private HANDLE handle;
     private RandomAccessFile sessionPipe;
 

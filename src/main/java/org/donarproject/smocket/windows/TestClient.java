@@ -22,14 +22,12 @@ import java.io.RandomAccessFile;
 
 public class TestClient {
     public static void main(String[] args) throws IOException {
-        RandomAccessFile pipe = new RandomAccessFile("\\\\.\\pipe\\testpipe", "rw");
-        InputStream in = new PipeClientInputStream(pipe);
-        final int bufferSize = 8192 * 16;
-        byte[] buffer = new byte[bufferSize];
         long time = 0;
         long byteReceived = 0;
-        try {
-
+        try (RandomAccessFile pipe = new RandomAccessFile("\\\\.\\pipe\\testpipe", "rw");
+             InputStream in = new PipeClientInputStream(pipe)) {
+            final int bufferSize = 8192 * 16;
+            byte[] buffer = new byte[bufferSize];
             int read;
             time = System.nanoTime();
             while ((read = in.read(buffer, 0, bufferSize)) != -1) {
@@ -38,7 +36,6 @@ public class TestClient {
         } catch (Throwable t) {
             t.printStackTrace();
         } finally {
-            pipe.close();
             System.out.println(byteReceived + "B in " + ((System.nanoTime() - time) / 1000000.) + " ms");
         }
     }

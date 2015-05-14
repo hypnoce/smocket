@@ -22,24 +22,24 @@ import java.util.logging.Logger;
 
 public class TestPClientSocket {
     private final static Logger logger = Logger.getLogger(TestPClientSocket.class.getName());
+
     public static void main(String[] args) throws IOException {
         long totalTime = System.nanoTime();
+        long time = 0;
+        long byteReceived = 0;
         for (int i = 0; i < 60; ++i) {
-            PSocket socket = new PSocket("testpipe", "7777");
-            InputStream in = socket.getInputStream();
-            final int bufferSize = 8192 * 16;
-            byte[] buffer = new byte[bufferSize];
-            long time = 0;
-            long byteReceived = 0;
-            try {
+            try (PSocket socket = new PSocket("testpipe", "7777")) {
+                InputStream in = socket.getInputStream();
+                final int bufferSize = 8192 * 16;
+                byte[] buffer = new byte[bufferSize];
                 int read;
                 time = System.nanoTime();
                 while ((read = in.read(buffer, 0, bufferSize)) != -1) {
                     byteReceived += read;
                 }
             } catch (Throwable t) {
+                t.printStackTrace();
             } finally {
-                socket.close();
                 logger.info("Socket " + i + " : " + (byteReceived) + "B in " + ((System.nanoTime() - time) / 1000000.) + " ms");
             }
         }

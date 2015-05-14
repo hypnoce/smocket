@@ -28,14 +28,12 @@ public class SocketInputStream {
     public static void main(String[] args) throws IOException {
         long totalTime = System.nanoTime();
         for (int i = 0; i < 60; ++i) {
-            Socket socket = new Socket("127.0.0.1", 8888);
-            InputStream in = socket.getInputStream();
-            final int bufferSize = 8192 * 16;
-            byte[] buffer = new byte[bufferSize];
             long time = 0;
             long byteReceived = 0;
-            try {
-
+            try (Socket socket = new Socket("127.0.0.1", 8888);
+                 InputStream in = socket.getInputStream()) {
+                final int bufferSize = 8192 * 16;
+                byte[] buffer = new byte[bufferSize];
                 int read;
                 time = System.nanoTime();
                 while ((read = in.read(buffer, 0, bufferSize)) != -1) {
@@ -44,7 +42,6 @@ public class SocketInputStream {
             } catch (Throwable t) {
                 t.printStackTrace();
             } finally {
-                socket.close();
                 logger.log(Level.INFO, "Socket " + i + " : " + (byteReceived) + "B in " + ((System.nanoTime() - time) / 1000000.) + " ms");
             }
         }

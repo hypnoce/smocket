@@ -178,36 +178,36 @@ public class SMOutputStream extends OutputStream implements SMStream {
         if (!Files.exists(path)) {
             Files.createFile(path);
         }
-        SMOutputStream smo = new SMOutputStream(path);
-        PeriodicBufferedOutputStream bufferedOutputStream = new PeriodicBufferedOutputStream(smo, 8192 * 16, 10);
-        Random rnd = new Random(System.nanoTime());
-        int size = 500000 / 4;
-        byte[][] values = new byte[size][];
-        for (int i = 0; i < size; ++i) {
-            values[i] = new byte[354 * 2];
-            rnd.nextBytes(values[i]);
-        }
-
-        BufferedReader bufferRead = new BufferedReader(new InputStreamReader(System.in));
-        System.out.println("Ready");
-        long bytesSent = 0;
-        String toto = bufferRead.readLine().concat("\n");
-        byte[] first = toto.getBytes();
-        bytesSent += first.length;
-        bufferedOutputStream.write(first);
-
-        long time = System.nanoTime();
-        for (int i = 0; i < 240; ++i) {
-            for (byte[] bytes : values) {
-                final int length = bytes.length;
-                bytesSent += length;
-                bufferedOutputStream.write(bytes, 0, length);
+        try (SMOutputStream smo = new SMOutputStream(path);
+             PeriodicBufferedOutputStream bufferedOutputStream = new PeriodicBufferedOutputStream(smo, 8192 * 16, 10)) {
+            Random rnd = new Random(System.nanoTime());
+            int size = 500000 / 4;
+            byte[][] values = new byte[size][];
+            for (int i = 0; i < size; ++i) {
+                values[i] = new byte[354 * 2];
+                rnd.nextBytes(values[i]);
             }
+
+            BufferedReader bufferRead = new BufferedReader(new InputStreamReader(System.in));
+            System.out.println("Ready. Press enter to start");
+            long bytesSent = 0;
+            String toto = bufferRead.readLine().concat("\n");
+            byte[] first = toto.getBytes();
+            bytesSent += first.length;
+            bufferedOutputStream.write(first);
+
+            long time = System.nanoTime();
+            for (int i = 0; i < 240; ++i) {
+                for (byte[] bytes : values) {
+                    final int length = bytes.length;
+                    bytesSent += length;
+                    bufferedOutputStream.write(bytes, 0, length);
+                }
+            }
+            bufferedOutputStream.flush();
+            time = (System.nanoTime() - time);
+            System.out.println((bytesSent) + "B in " + (time / 1000000.) + " ms");
+            System.out.println("Throughput : " + (bytesSent / 1000000.) / (time / 1000000000.) + " MB/s");
         }
-        bufferedOutputStream.flush();
-        time = (System.nanoTime() - time);
-        bufferedOutputStream.close();
-        System.out.println((bytesSent) + "B in " + (time / 1000000.) + " ms");
-        System.out.println("Throughput : " + (bytesSent / 1000000.) / (time / 1000000000.) + " MB/s");
     }
 }

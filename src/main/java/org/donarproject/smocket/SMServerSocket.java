@@ -158,17 +158,16 @@ public class SMServerSocket implements Closeable {
         logger.log(Level.INFO, "Ready");
         for (; ; ) {
             Iterable<SMSocket> sockets = serverSocket.accept();
-            for (final SMSocket socket : sockets) {
+            for (final SMSocket _socket : sockets) {
                 new Thread(Thread.currentThread().getThreadGroup(), new Runnable() {
                     @Override
 
                     public void run() {
-                        PeriodicBufferedOutputStream bufferedOutputStream = null;
                         long bytesSent = 0;
                         long time = 0;
-                        try {
-                            OutputStream smo = socket.getOutputStream();
-                            bufferedOutputStream = new PeriodicBufferedOutputStream(smo, 8192 * 16, 10);
+                        try (SMSocket socket = _socket;
+                             OutputStream smo = socket.getOutputStream();
+                             PeriodicBufferedOutputStream bufferedOutputStream = new PeriodicBufferedOutputStream(smo, 8192 * 16, 10)) {
                             time = System.nanoTime();
                             for (int i = 0; i < 100; ++i) {
                                 for (byte[] bytes : values) {
@@ -180,20 +179,8 @@ public class SMServerSocket implements Closeable {
                             bufferedOutputStream.flush();
                         } catch (Throwable t) {
                             t.printStackTrace();
-                            try {
-                                socket.close();
-                            } catch (IOException e) {
-                                e.printStackTrace();
-                            }
                         } finally {
                             time = (System.nanoTime() - time);
-                            if (bufferedOutputStream != null) {
-                                try {
-                                    bufferedOutputStream.close();
-                                } catch (IOException e) {
-                                    e.printStackTrace();
-                                }
-                            }
                             logger.log(Level.INFO, (bytesSent) + "B in " + (time / 1000000.) + " ms");
                             logger.log(Level.INFO, "Throughput : " + (bytesSent / 1000000.) / (time / 1000000000.) + " MB/s");
                         }
