@@ -19,21 +19,18 @@ package org.donarproject.smocket;
 import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class PeriodicBufferedOutputStream extends FilterOutputStream implements Runnable {
 
     private final byte buf[];
-    private final byte buf2[];
 
     protected volatile int writeCursor = 0;
     protected volatile int flushCursor = 0;
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-
-    private final ReentrantReadWriteLock lock = new ReentrantReadWriteLock();
 
     public PeriodicBufferedOutputStream(OutputStream out) {
         this(out, 8192);
@@ -49,94 +46,53 @@ public class PeriodicBufferedOutputStream extends FilterOutputStream implements 
             throw new IllegalArgumentException("Buffer size <= 0");
         }
         buf = new byte[size];
-        buf2 = new byte[size];
         scheduler.scheduleWithFixedDelay(this, period, period, TimeUnit.MILLISECONDS);
     }
 
     private void flushBuffer() throws IOException {
-        try {
-//            lock.writeLock().lock();
-            int _flush = flushCursor;
-            int _write = writeCursor;
-            while (_flush < _write) {
-                out.write(buf, _flush, _write - _flush);
-                _flush = _write;
-                _write = writeCursor;
-            }
-            flushCursor = 0;
-//            int _count = count;
-//            if (_count > 0) {
-//                out.write(buf, 0, _count);
-//                while (count != _count) {
-//                    out.write(buf, _count, count - _count);
-//                    _count = count;
-//                }
-//                count = 0;
-//            }
-        } finally {
-//            lock.writeLock().unlock();
+        int _flush = flushCursor;
+        int _write = writeCursor;
+        while (_flush < _write) {
+            out.write(buf, _flush, _write - _flush);
+            _flush = _write;
+            _write = writeCursor;
         }
+        flushCursor = 0;
     }
 
     public void write(int b) throws IOException {
-        throw new RuntimeException();
-//        try {
-//            lock.readLock().lock();
-//            if (count >= buf.length) {
-//                flushBuffer();
-//            }
-//            buf[count++] = (byte) b;
-//        } finally {
-//            lock.readLock().unlock();
-//        }
+        if (writeCursor + 1 > buf.length){
+            flush();
+        }
+        final int _count = writeCursor;
+        buf[_count] = (byte)b;
+        ++writeCursor;
     }
 
     public void write(byte b[], int off, int len) throws IOException {
         if (len >= buf.length) {
-//            flushBuffer();
             int i = 0;
             for(; i < len - buf.length ; i += buf.length) {
                 addToBuffer(b, i, buf.length);
             }
             addToBuffer(b, i, len % buf.length);
-//            try {
-//                lock.writeLock().lock();
-//                out.write(b, off, len);
-//            } finally {
-//                lock.writeLock().unlock();
-//            }
-            return;
-        }
-//        final int _count = writeCursor;
-//        if (len > buf.length - _count) {
-//            flush();
-////            flushBuffer();
-//        }
-        try {
+        } else {
             addToBuffer(b, off, len);
-//            lock.readLock().lock();
-//            System.arraycopy(b, off, buf, _count, len);
-//            count += len;
-        } finally {
-//            lock.readLock().unlock();
         }
     }
 
     private void addToBuffer(byte b[], int off, int len) throws IOException {
         if (writeCursor + len > buf.length){
             flush();
-            writeCursor = 0;
         }
         final int _count = writeCursor;
         System.arraycopy(b, off, buf, _count, len);
         writeCursor += len;
-//        buf[_count]
     }
 
     public void flush() throws IOException {
         while (flushCursor > 0){}
-//        flushBuffer();
-//        out.flush();
+        writeCursor = 0;
     }
 
     @Override
