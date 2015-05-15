@@ -80,7 +80,6 @@ public class SMOutputStream extends OutputStream implements SMStream {
         _mbb.putInt(0);
         _mbb.position(cursor);
         _fileLock.release();
-
     }
 
     @Override
@@ -113,13 +112,9 @@ public class SMOutputStream extends OutputStream implements SMStream {
         final MappedByteBuffer _mbb = mbb;
         final FileLock _fileLock;
         final FileLock _fileLock2;
-        _fileLock = fc.lock(cursor + HEADER_SIZE, paddedLength, false);
-        cursor += HEADER_SIZE + paddedLength;
-        if (cursor == MAPPED_SIZE) {
-            cursor = 0;
-        }
-        assert cursor % 64 == 0;
-        final int _cursor = cursor;
+        final int _position = cursor + HEADER_SIZE;
+        _fileLock = fc.lock(_position, paddedLength, false);
+        final int _cursor = _position + paddedLength;
         _mbb.putInt(len);
         _mbb.put(b, off, len);
         _fileLock2 = fc.lock(_cursor, HEADER_SIZE, false);
@@ -131,6 +126,11 @@ public class SMOutputStream extends OutputStream implements SMStream {
         _mbb.putInt(0);
         _mbb.position(_cursor);
         _fileLock.release();
+        cursor = _cursor;
+        assert cursor % 64 == 0;
+        if (cursor == MAPPED_SIZE) {
+            cursor = 0;
+        }
     }
 
     private static int getPaddedLength(int len) {

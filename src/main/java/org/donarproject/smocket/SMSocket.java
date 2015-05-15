@@ -196,7 +196,7 @@ public class SMSocket implements Closeable {
         return outputStream;
     }
 
-    public static void main2(String[] args) throws InterruptedException, IOException, TimeoutException {
+    public static void main(String[] args) throws InterruptedException, IOException, TimeoutException {
         long totalTime = System.nanoTime();
         for (int i = 0; i < 60; ++i) {
             _do(i);
@@ -204,7 +204,7 @@ public class SMSocket implements Closeable {
         LOGGER.log(Level.INFO, (System.nanoTime() - totalTime) / 1000000. + " ms");
     }
 
-    public static void main(String[] args) throws InterruptedException, IOException, TimeoutException {
+    public static void main2(String[] args) throws InterruptedException, IOException, TimeoutException {
         long totalTime = System.nanoTime();
         Thread[] threads = new Thread[10];
         for (int i = 0; i < threads.length; ++i) {
