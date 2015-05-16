@@ -40,8 +40,6 @@ public class SMSocket implements Closeable {
 
     private final Path host;
 
-    private final Thread closeNotificationThread;
-
     /**
      * Handles a lock that will be released when the other end point is closed
      */
@@ -93,14 +91,7 @@ public class SMSocket implements Closeable {
             add(StandardOpenOption.READ);
             add(StandardOpenOption.WRITE);
         }});
-        inputStream = new SMInputStream(in);
-        closeNotificationThread = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                watchForClose(closeLocker);
-            }
-        }, "Close wait " + sessionId);
-        closeNotificationThread.start();
+        inputStream = new SMInputStream(in, closeLocker);
     }
 
     SMSocket(final Path host, final String port, final String sessionId, final Path in, final Path out) throws IOException, InterruptedException, TimeoutException {
@@ -127,31 +118,11 @@ public class SMSocket implements Closeable {
                 add(StandardOpenOption.READ);
                 add(StandardOpenOption.WRITE);
             }});
-            inputStream = new SMInputStream(inFC);
-            closeNotificationThread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    watchForClose(closeLocker);
-                }
-            }, "Close wait " + sessionId);
-            closeNotificationThread.start();
+            inputStream = new SMInputStream(inFC, closeLocker);
         } catch (Throwable t) {
             t.printStackTrace();
             close();
             throw t;
-        }
-    }
-
-    private void watchForClose(FileChannel fc) {
-        try {
-            fc.lock(0, 1, true);
-        } catch (Throwable t) {
-        } finally {
-            try {
-                close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
         }
     }
 
@@ -162,8 +133,6 @@ public class SMSocket implements Closeable {
                     remoteCloseLocker.release();
                 if (closeLocker != null && closeLocker.isOpen())
                     closeLocker.close();
-                if (closeNotificationThread != null)
-                    closeNotificationThread.interrupt();
                 closed = true;
                 if (inputStream != null) {
                     inputStream.close();
@@ -199,7 +168,7 @@ public class SMSocket implements Closeable {
         return outputStream;
     }
 
-    public static void main2(String[] args) throws InterruptedException, IOException, TimeoutException {
+    public static void main(String[] args) throws InterruptedException, IOException, TimeoutException {
         long totalTime = System.nanoTime();
         for (int i = 0; i < 60; ++i) {
             _do(i);
@@ -207,7 +176,7 @@ public class SMSocket implements Closeable {
         logger.log(Level.INFO, (System.nanoTime() - totalTime) / 1000000. + " ms");
     }
 
-    public static void main(String[] args) throws InterruptedException, IOException, TimeoutException {
+    public static void main2(String[] args) throws InterruptedException, IOException, TimeoutException {
         long totalTime = System.nanoTime();
         ExecutorService service = Executors.newFixedThreadPool(16);
         Set<Future> futures = new HashSet<>();
