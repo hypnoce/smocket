@@ -34,7 +34,6 @@ public class SMInputStream extends InputStream implements SMStream {
     private final static int DOUBLE_REDUCED_CACHE_LINE = 2 * CACHE_LINE - HEADER_SIZE;
 
     private final FileChannel fc;
-    private boolean readingSize = true;
     private int available = 0;
     private int padding = 0;
     private FileLock fileLock;
@@ -42,18 +41,25 @@ public class SMInputStream extends InputStream implements SMStream {
 
     private boolean closed = false;
     private final Object closeLock = new Object();
+    private final FileChannel closeGuard;
 
     public SMInputStream(Path address) throws IOException {
+        this(address, null);
+    }
+
+    public SMInputStream(Path address, FileChannel closeGuard) throws IOException {
         Set<StandardOpenOption> options = new HashSet<>();
         options.add(StandardOpenOption.READ);
         options.add(StandardOpenOption.WRITE);
         options.add(StandardOpenOption.DELETE_ON_CLOSE);
         fc = FileSystems.getDefault().provider().newFileChannel(address, options);
+        this.closeGuard = closeGuard;
         prepareBuffer();
     }
 
-    public SMInputStream(FileChannel fc) throws IOException {
+    public SMInputStream(FileChannel fc, FileChannel closeGuard) throws IOException {
         this.fc = fc;
+        this.closeGuard = closeGuard;
         prepareBuffer();
     }
 
@@ -64,16 +70,25 @@ public class SMInputStream extends InputStream implements SMStream {
 
     @Override
     public int read() throws IOException {
-        if (readingSize) {
+        if (!checkAvailable())
+            return -1;
+        --available;
+        return mbb.get();
+    }
+
+    private boolean checkAvailable() throws IOException {
+        if (available == 0) {
             readSize();
             if (available == 0) {
-                return -1;
+                return false;
+            } else if (closeGuard != null) {
+                try (FileLock lock = closeGuard.tryLock(0, 1, true)) {
+                    if (lock != null)
+                        return false;
+                }
             }
         }
-        if (--available == 0) {
-            readingSize = true;
-        }
-        return mbb.get();
+        return true;
     }
 
     private void readSize() throws IOException {
@@ -89,9 +104,6 @@ public class SMInputStream extends InputStream implements SMStream {
         fileLock = _fileLock;
         available = _mbb.getInt();
         padding = getPadding(available);
-        if (available != 0) {
-            readingSize = false;
-        }
     }
 
     private static int getPadding(int len) {
@@ -124,20 +136,13 @@ public class SMInputStream extends InputStream implements SMStream {
         } else if (len == 0) {
             return 0;
         }
-        if (readingSize) {
-            readSize();
-            if (available == 0) {
-                return -1;
-            }
-        }
+        if (!checkAvailable())
+            return -1;
         if (available < len) {
             len = available;
-            readingSize = true;
+            available = 0;
         } else {
             available -= len;
-            if (available == 0) {
-                readingSize = true;
-            }
         }
         mbb.get(b, off, len);
         return len;

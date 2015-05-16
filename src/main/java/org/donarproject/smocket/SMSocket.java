@@ -40,8 +40,6 @@ public class SMSocket implements Closeable {
 
     private final Path host;
 
-    private final Thread closeNotificationThread;
-
     /**
      * Handles a lock that will be released when the other end point is closed
      */
@@ -89,14 +87,12 @@ public class SMSocket implements Closeable {
             FileChannel rackChannel = SMUtils.createDeleteOnExitFile(rack);
             fcs.add(rackChannel);
 
-            Path in = utils.waitForFileCreation(host, suffix + "_in", 5, TimeUnit.SECONDS);
-            closeLocker = in.getFileSystem().provider().newFileChannel(host.resolve(suffix + "_server.lock"), new HashSet<OpenOption>() {{
-                add(StandardOpenOption.READ);
-                add(StandardOpenOption.WRITE);
-            }});
-            inputStream = new SMInputStream(in);
-            closeNotificationThread = new Thread(() -> watchForClose(closeLocker), "Close wait " + sessionId);
-            closeNotificationThread.start();
+        Path in = utils.waitForFileCreation(host, suffix + "_in", 5, TimeUnit.SECONDS);
+        closeLocker = in.getFileSystem().provider().newFileChannel(host.resolve(suffix + "_server.lock"), new HashSet<OpenOption>() {{
+            add(StandardOpenOption.READ);
+            add(StandardOpenOption.WRITE);
+        }});
+        inputStream = new SMInputStream(in, closeLocker);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new IOException("Cannot connect to " + hostname + ":" + port, e);
@@ -129,26 +125,11 @@ public class SMSocket implements Closeable {
                 add(StandardOpenOption.READ);
                 add(StandardOpenOption.WRITE);
             }});
-            inputStream = new SMInputStream(inFC);
-            closeNotificationThread = new Thread(() -> watchForClose(closeLocker), "Close wait " + sessionId);
-            closeNotificationThread.start();
+            inputStream = new SMInputStream(inFC, closeLocker);
         } catch (Throwable t) {
             t.printStackTrace();
             close();
             throw t;
-        }
-    }
-
-    private void watchForClose(FileChannel fc) {
-        try {
-            fc.lock(0, 1, true);
-        } catch (Throwable t) {
-        } finally {
-            try {
-                close();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
         }
     }
 
@@ -159,8 +140,6 @@ public class SMSocket implements Closeable {
                     remoteCloseLocker.release();
                 if (closeLocker != null && closeLocker.isOpen())
                     closeLocker.close();
-                if (closeNotificationThread != null)
-                    closeNotificationThread.interrupt();
                 closed = true;
                 if (inputStream != null) {
                     inputStream.close();
