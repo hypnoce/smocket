@@ -114,8 +114,15 @@ public class SMOutputStream extends OutputStream implements SMStream {
         final FileLock _fileLock2;
         final int _position = cursor + HEADER_SIZE;
         _fileLock = fc.lock(_position, paddedLength, false);
-        final int _cursor = _position + paddedLength;
+        cursor = _position + paddedLength;
+        if (cursor == MAPPED_SIZE) {
+            cursor = 0;
+        }
+        assert cursor % 64 == 0;
+        final int _cursor = cursor;
+        /* Set the length of the next byte stream */
         _mbb.putInt(len);
+        /* Write the byte stream */
         _mbb.put(b, off, len);
         _fileLock2 = fc.lock(_cursor, HEADER_SIZE, false);
         if (fileLock != null) {
@@ -123,14 +130,10 @@ public class SMOutputStream extends OutputStream implements SMStream {
         }
         fileLock = _fileLock2;
         _mbb.position(_cursor);
+        /* Set the next available length to 0 */
         _mbb.putInt(0);
         _mbb.position(_cursor);
         _fileLock.release();
-        cursor = _cursor;
-        assert cursor % 64 == 0;
-        if (cursor == MAPPED_SIZE) {
-            cursor = 0;
-        }
     }
 
     private static int getPaddedLength(int len) {
