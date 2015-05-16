@@ -170,7 +170,7 @@ public class SMServerSocket implements Closeable {
                             OutputStream smo = socket.getOutputStream();
                             bufferedOutputStream = new PeriodicBufferedOutputStream(smo, 8192 * 16, 10);
                             time = System.nanoTime();
-                            for (int i = 0; i < 100; ++i) {
+                            for (int i = 0; i < 1; ++i) {
                                 for (byte[] bytes : values) {
                                     final int length = bytes.length;
                                     bytesSent += length;

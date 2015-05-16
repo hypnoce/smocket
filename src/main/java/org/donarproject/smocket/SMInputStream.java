@@ -41,21 +41,25 @@ public class SMInputStream extends InputStream implements SMStream {
 
     private boolean closed = false;
     private final Object closeLock = new Object();
-    private final FileChannel lockGuard;
+    private final FileChannel closeGuard;
 
-    public SMInputStream(Path address, FileChannel lockGuard) throws IOException {
+    public SMInputStream(Path address) throws IOException {
+        this(address, null);
+    }
+
+    public SMInputStream(Path address, FileChannel closeGuard) throws IOException {
         Set<StandardOpenOption> options = new HashSet<>();
         options.add(StandardOpenOption.READ);
         options.add(StandardOpenOption.WRITE);
         options.add(StandardOpenOption.DELETE_ON_CLOSE);
         fc = FileSystems.getDefault().provider().newFileChannel(address, options);
+        this.closeGuard = closeGuard;
         prepareBuffer();
-        this.lockGuard = lockGuard;
     }
 
-    public SMInputStream(FileChannel fc, FileChannel lockGuard) throws IOException {
+    public SMInputStream(FileChannel fc, FileChannel closeGuard) throws IOException {
         this.fc = fc;
-        this.lockGuard = lockGuard;
+        this.closeGuard = closeGuard;
         prepareBuffer();
     }
 
@@ -77,8 +81,8 @@ public class SMInputStream extends InputStream implements SMStream {
             readSize();
             if (available == 0) {
                 return false;
-            } else if(lockGuard != null) {
-                try (FileLock lock = lockGuard.tryLock(0, 1, true)){
+            } else if(closeGuard != null) {
+                try (FileLock lock = closeGuard.tryLock(0, 1, true)){
                     if(lock != null)
                         return false;
                 }
@@ -191,7 +195,7 @@ public class SMInputStream extends InputStream implements SMStream {
     }
 
     public static void main(String[] args) throws IOException {
-        SMInputStream smi = new SMInputStream(Paths.get("E:\\exchange_file"), null);
+        SMInputStream smi = new SMInputStream(Paths.get("E:\\exchange_file"));
         long bytesReceived = 0;
         final int bufferSize = 8192 * 16;
         try {
