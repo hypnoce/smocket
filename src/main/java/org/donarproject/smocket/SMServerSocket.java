@@ -38,10 +38,10 @@ public class SMServerSocket implements Closeable {
 
     private boolean closed = false;
 
-    FileChannel fc;
-    FileLock fl;
+    private final FileChannel fc;
+    private FileLock fl;
 
-    final Pattern pattern;
+    private final Pattern pattern;
 
     public SMServerSocket(String host, String port) throws IOException {
         logger.fine("Starting SM server on : " + host + ":" + port);

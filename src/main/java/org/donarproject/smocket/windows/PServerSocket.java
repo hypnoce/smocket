@@ -33,9 +33,9 @@ import static com.sun.jna.platform.win32.WinNT.HANDLE;
  */
 public class PServerSocket {
 
-    final HANDLE acceptHandle;
-    final HANDLE acceptMutex;
-    final HANDLE acceptMutex2;
+    private final HANDLE acceptHandle;
+    private final HANDLE acceptMutex;
+    private final HANDLE acceptMutex2;
 
     public PServerSocket(String host, String port) throws IOException {
         final String pipeName = host + ":" + port;

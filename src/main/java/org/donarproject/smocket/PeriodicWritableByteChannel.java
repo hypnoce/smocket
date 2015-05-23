@@ -28,9 +28,9 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
  * Created by hypnoce on 12/05/2014.
  */
 public class PeriodicWritableByteChannel implements Runnable, WritableByteChannel {
-    protected ByteBuffer buf;
+    private final ByteBuffer buf;
 
-    protected WritableByteChannel out;
+    private final WritableByteChannel out;
 
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
 
